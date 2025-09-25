@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Battle - Мультиплеерная игра</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: #000000;
+            color: white;
+            overflow: hidden;
+            touch-action: none;
+            height: 100vh;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: #000000;
+            cursor: crosshair;
+            image-rendering: pixelated;
+        }
+        
+        .ui-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 15px;
+            border-radius: 15px;
+            z-index: 100;
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            min-width: 200px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 14px 18px;
+            background: linear-gradient(45deg, #4a4a4a, #6a6a6a);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+            font-weight: bold;
+        }
+        
+        button:hover {
+            background: linear-gradient(45deg, #5a5a5a, #7a7a7a);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #2a2a2a;
+            color: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        #handButton {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(15px);
+            cursor: pointer;
+            user-select: none;
+            touch-action: none;
+            box-shadow: 0 12px 35px rgba(255, 107, 107, 0.5);
+            transition: all 0.4s ease;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        #handButton:hover {
+            transform: scale(1.15);
+            box-shadow: 0 15px 40px rgba(255, 107, 107, 0.7);
+        }
+        
+        #handButton:active {
+            transform: scale(0.9);
+        }
+        
+        #handButton.active {
+            background: linear-gradient(45deg, #4ecdc4, #88d8d0);
+            box-shadow: 0 12px 35px rgba(78, 205, 196, 0.5);
+        }
+        
+        #colorPicker {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 12px;
+            border-radius: 15px;
+            z-index: 100;
+            display: flex;
+            gap: 10px;
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .color-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .color-option:hover {
+            transform: scale(1.2);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        .color-option.active {
+            border-color: white;
+            transform: scale(1.3);
+            box-shadow: 0 0 20px currentColor;
+        }
+        
+        #leaderboard {
+            position: absolute;
+            top: 90px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 18px;
+            border-radius: 15px;
+            max-width: 300px;
+            z-index: 100;
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            max-height: 65vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        #leaderboard h3 {
+            margin-bottom: 15px;
+            color: #ffd700;
+            text-align: center;
+            font-size: 20px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        #leaderboardList {
+            list-style: none;
+        }
+        
+        #leaderboardList li {
+            padding: 10px 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 15px;
+            transition: background 0.3s ease;
+        }
+        
+        #leaderboardList li:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+        
+        .player-stats {
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .stat {
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+        }
+        
+        .stat-value {
+            color: #4fc3f7;
+            font-weight: bold;
+            font-size: 17px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .coords {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            z-index: 100;
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            white-space: nowrap;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+        
+        .zoom-info {
+            position: absolute;
+            top: 50%;
+            right: 15px;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px 15px;
+            border-radius: 25px;
+            font-size: 14px;
+            z-index: 100;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+        
+        .energy-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        
+        .energy-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00ccff);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+        
+        .current-color {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            border: 3px solid white;
+            margin-left: 12px;
+            box-shadow: 0 0 15px currentColor;
+        }
+        
+        .grid-toggle {
+            position: absolute;
+            bottom: 20px;
+            left: 110px;
+            z-index: 100;
+        }
+        
+        #toggleGrid {
+            padding: 12px 16px;
+            background: linear-gradient(45deg, #666, #888);
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            z-index: 1000;
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            animation: slideDown 0.5s ease-out;
+        }
+        
+        @keyframes slideDown {
+            from { transform: translateX(-50%) translateY(-100px); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+        
+        /* Адаптивность */
+        @media (max-width: 480px) {
+            .ui-panel {
+                min-width: 170px;
+                padding: 12px;
+            }
+            
+            #leaderboard {
+                max-width: 250px;
+                padding: 15px;
+                top: 80px;
+            }
+            
+            #handButton {
+                width: 70px;
+                height: 70px;
+                bottom: 15px;
+                left: 15px;
+            }
+            
+            #colorPicker {
+                padding: 10px;
+                gap: 8px;
+            }
+            
+            .color-option {
+                width: 35px;
+                height: 35px;
+            }
+            
+            button {
+                padding: 12px 16px;
+                font-size: 14px;
+            }
+            
+            .grid-toggle {
+                left: 95px;
+                bottom: 15px;
+            }
+        }
+        
+        /* Анимации */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px) scale(0.9); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        
+        .ui-panel, #leaderboard, #handButton, #colorPicker {
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pixelPlaced {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        .pixel-placed {
+            animation: pixelPlaced 0.3s ease-out;
+        }
+        
+        .connection-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .connection-status.connected {
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+        
+        .connection-status.disconnected {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff4444;
+            border: 1px solid #ff4444;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="250" height="250"></canvas>
+        
+        <div class="ui-panel">
+            <div class="player-stats">
+                <div class="stat">
+                    🔲 Пиксели: <span class="stat-value" id="tokens">0</span>
+                </div>
+                <div class="stat">
+                    ⭐ Уровень: <span class="stat-value" id="level">1</span>
+                </div>
+                <div class="stat">
+                    ⚡ Энергия: <span class="stat-value" id="energy">100</span>
+                    <div class="current-color" id="currentColor"></div>
+                </div>
+                <div class="energy-bar">
+                    <div class="energy-fill" id="energyFill"></div>
+                </div>
+                <div class="stat">
+                    👤 Онлайн: <span class="stat-value" id="onlineCount">1</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="colorPicker">
+            <div class="color-option active" style="background: #ff4444;" data-color="#ff4444" title="Красный"></div>
+            <div class="color-option" style="background: #44ff44;" data-color="#44ff44" title="Зеленый"></div>
+            <div class="color-option" style="background: #4444ff;" data-color="#4444ff" title="Синий"></div>
+            <div class="color-option" style="background: #ffff44;" data-color="#ffff44" title="Желтый"></div>
+            <div class="color-option" style="background: #ff44ff;" data-color="#ff44ff" title="Розовый"></div>
+            <div class="color-option" style="background: #44ffff;" data-color="#44ffff" title="Бирюзовый"></div>
+            <div class="color-option" style="background: #ff8844;" data-color="#ff8844" title="Оранжевый"></div>
+            <div class="color-option" style="background: #8844ff;" data-color="#8844ff" title="Фиолетовый"></div>
+        </div>
+        
+        <button id="handButton" class="pulse">👆<br>Рука</button>
+        
+        <div class="grid-toggle">
+            <button id="toggleGrid">📋 Сетка</button>
+        </div>
+        
+        <div class="controls">
+            <button id="dynamiteButton">💣 Динамит (100)</button>
+            <button id="zoomIn">🔍 + Увеличить</button>
+            <button id="zoomOut">🔍 - Уменьшить</button>
+            <button id="resetView">🎯 Центр</button>
+            <button id="maxZoom">🔎 Макс. zoom</button>
+        </div>
+        
+        <div class="coords">
+            📍 X: <span id="coordX">125</span> Y: <span id="coordY">125</span> | 
+            🔍 <span id="zoomLevel">500%</span> |
+            📏 <span id="pixelSize">5px</span>
+        </div>
+        
+        <div class="zoom-info">
+            Увеличено: <span id="zoomPercent">500%</span>
+        </div>
+        
+        <div id="leaderboard">
+            <h3>🏆 Топ игроков</h3>
+            <ol id="leaderboardList"></ol>
+        </div>
+        
+        <div class="connection-status connected" id="connectionStatus">✓ Online</div>
+    </div>
+
+    <script>
+        class PixelGame {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.container = document.getElementById('gameContainer');
+                
+                // Автоматическое определение WebSocket URL для production
+                this.wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                this.wsHost = window.location.host;
+                
+                // Игровые переменные
+                this.tokens = parseFloat(localStorage.getItem('tokens')) || 0;
+                this.level = parseInt(localStorage.getItem('level')) || 1;
+                this.energy = parseInt(localStorage.getItem('energy')) || 100;
+                this.playerId = localStorage.getItem('playerId') || this.generatePlayerId();
+                this.selectedColor = localStorage.getItem('selectedColor') || '#ff4444';
+                this.showGrid = localStorage.getItem('showGrid') !== 'false';
+                
+                // Переменные камеры - УВЕЛИЧЕННЫЙ ZOOM
+                this.cameraX = 125;
+                this.cameraY = 125;
+                this.zoom = 5; // Увеличенный начальный zoom
+                this.minZoom = 1; // Минимальный zoom увеличен
+                this.maxZoom = 20; // Максимальный zoom увеличен
+                
+                // Размеры карты
+                this.mapWidth = 250;
+                this.mapHeight = 250;
+                
+                // Состояние управления
+                this.handMode = false;
+                this.isDragging = false;
+                this.lastTouchX = 0;
+                this.lastTouchY = 0;
+                
+                // WebSocket соединение
+                this.socket = null;
+                this.players = {};
+                this.pixels = {};
+                this.connectionStatus = document.getElementById('connectionStatus');
+                
+                this.init();
+            }
+            
+            generatePlayerId() {
+                const id = 'player_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('playerId', id);
+                return id;
+            }
+            
+            init() {
+                this.setupCanvas();
+                this.setupEventListeners();
+                this.setupColorPicker();
+                this.connectToServer();
+                this.updateUI();
+                this.gameLoop();
+            }
+            
+            setupEventListeners() {
+                // Кнопки управления
+                document.getElementById('dynamiteButton').addEventListener('click', () => this.useDynamite());
+                document.getElementById('zoomIn').addEventListener('click', () => this.setZoom(this.zoom * 1.5));
+                document.getElementById('zoomOut').addEventListener('click', () => this.setZoom(this.zoom / 1.5));
+                document.getElementById('resetView').addEventListener('click', () => this.resetCamera());
+                document.getElementById('maxZoom').addEventListener('click', () => this.setZoom(this.maxZoom));
+                document.getElementById('toggleGrid').addEventListener('click', () => this.toggleGrid());
+                
+                // Кнопка руки
+                document.getElementById('handButton').addEventListener('click', () => this.toggleHandMode());
+                
+                // Управление мышью и касаниями
+                this.setupInputHandlers();
+                
+                // Колесико мыши для зума
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomFactor = e.deltaY > 0 ? 0.8 : 1.2;
+                    this.setZoom(this.zoom * zoomFactor, e.clientX, e.clientY);
+                });
+            }
+            
+            toggleGrid() {
+                this.showGrid = !this.showGrid;
+                localStorage.setItem('showGrid', this.showGrid);
+                document.getElementById('toggleGrid').textContent = this.showGrid ? '📋 Сетка' : '⬜ Сетка';
+                this.showNotification(this.showGrid ? 'Сетка включена' : 'Сетка выключена');
+            }
+            
+            setupColorPicker() {
+                const colorOptions = document.querySelectorAll('.color-option');
+                const currentColorElement = document.getElementById('currentColor');
+                
+                colorOptions.forEach(option => {
+                    option.addEventListener('click', () => {
+                        colorOptions.forEach(opt => opt.classList.remove('active'));
+                        option.classList.add('active');
+                        
+                        this.selectedColor = option.dataset.color;
+                        currentColorElement.style.background = this.selectedColor;
+                        localStorage.setItem('selectedColor', this.selectedColor);
+                        
+                        // Отправляем обновление цвета на сервер
+                        this.sendColorUpdate();
+                        this.showNotification(`Цвет изменен на ${option.title}`);
+                    });
+                });
+                
+                // Устанавливаем начальный цвет
+                currentColorElement.style.background = this.selectedColor;
+                const activeColor = document.querySelector(`.color-option[data-color="${this.selectedColor}"]`);
+                if (activeColor) {
+                    activeColor.classList.add('active');
+                }
+            }
+            
+            setupInputHandlers() {
+                // Обработка мыши
+                this.canvas.addEventListener('mousedown', (e) => {
+                    if (this.handMode) {
+                        this.startDrag(e.clientX, e.clientY);
+                    } else {
+                        this.placePixelAtEvent(e);
+                    }
+                });
+                
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (this.isDragging) {
+                        this.handleDrag(e.clientX, e.clientY);
+                    }
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    this.stopDrag();
+                });
+                
+                // Обработка касаний
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (e.touches.length === 1) {
+                        const touch = e.touches[0];
+                        if (this.handMode) {
+                            this.startDrag(touch.clientX, touch.clientY);
+                        } else {
+                            this.placePixelAtEvent(touch);
+                        }
+                    } else if (e.touches.length === 2) {
+                        this.handlePinchStart(e);
+                    }
+                });
+                
+                this.canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    if (this.isDragging && e.touches.length === 1) {
+                        const touch = e.touches[0];
+                        this.handleDrag(touch.clientX, touch.clientY);
+                    } else if (e.touches.length === 2) {
+                        this.handlePinchZoom(e);
+                    }
+                });
+                
+                document.addEventListener('touchend', (e) => {
+                    if (e.touches.length === 0) {
+                        this.stopDrag();
+                        this.lastPinchDistance = null;
+                    }
+                });
+            }
+            
+            toggleHandMode() {
+                this.handMode = !this.handMode;
+                const handButton = document.getElementById('handButton');
+                
+                if (this.handMode) {
+                    handButton.classList.add('active');
+                    this.canvas.style.cursor = 'grab';
+                    handButton.innerHTML = '✋<br>Рука';
+                    handButton.classList.remove('pulse');
+                    this.showNotification('Режим перемещения включен');
+                } else {
+                    handButton.classList.remove('active');
+                    this.canvas.style.cursor = 'crosshair';
+                    handButton.innerHTML = '👆<br>Рука';
+                    handButton.classList.add('pulse');
+                    this.showNotification('Режим рисования включен');
+                }
+            }
+            
+            startDrag(clientX, clientY) {
+                if (!this.handMode) return;
+                
+                this.isDragging = true;
+                this.lastTouchX = clientX;
+                this.lastTouchY = clientY;
+                this.canvas.style.cursor = 'grabbing';
+            }
+            
+            handleDrag(clientX, clientY) {
+                if (!this.isDragging || !this.handMode) return;
+                
+                const deltaX = clientX - this.lastTouchX;
+                const deltaY = clientY - this.lastTouchY;
+                
+                const sensitivity = 1.5 / this.zoom;
+                
+                this.cameraX = Math.max(0, Math.min(this.mapWidth, 
+                    this.cameraX - deltaX * sensitivity));
+                this.cameraY = Math.max(0, Math.min(this.mapHeight, 
+                    this.cameraY - deltaY * sensitivity));
+                
+                this.lastTouchX = clientX;
+                this.lastTouchY = clientY;
+                this.updateCoordsDisplay();
+            }
+            
+            stopDrag() {
+                this.isDragging = false;
+                this.canvas.style.cursor = this.handMode ? 'grab' : 'crosshair';
+            }
+            
+            handlePinchStart(e) {
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                
+                this.lastPinchDistance = Math.sqrt(
+                    Math.pow(touch2.clientX - touch1.clientX, 2) + 
+                    Math.pow(touch2.clientY - touch1.clientY, 2)
+                );
+            }
+            
+            handlePinchZoom(e) {
+                e.preventDefault();
+                
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                
+                const currentDistance = Math.sqrt(
+                    Math.pow(touch2.clientX - touch1.clientX, 2) + 
+                    Math.pow(touch2.clientY - touch1.clientY, 2)
+                );
+                
+                if (this.lastPinchDistance) {
+                    const zoomFactor = currentDistance / this.lastPinchDistance;
+                    this.setZoom(this.zoom * zoomFactor);
+                }
+                
+                this.lastPinchDistance = currentDistance;
+            }
+            
+            placePixelAtEvent(event) {
+                if (this.energy <= 0 || this.handMode) return;
+                
+                const rect = this.canvas.getBoundingClientRect();
+                const clientX = event.clientX || event.touches[0].clientX;
+                const clientY = event.clientY || event.touches[0].clientY;
+                
+                const x = Math.floor((clientX - rect.left) / this.zoom + this.cameraX - this.canvas.width / (2 * this.zoom));
+                const y = Math.floor((clientY - rect.top) / this.zoom + this.cameraY - this.canvas.height / (2 * this.zoom));
+                
+                if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
+                    this.placePixel(x, y);
+                }
+            }
+            
+            setZoom(newZoom, centerX = null, centerY = null) {
+                const oldZoom = this.zoom;
+                this.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, newZoom));
+                
+                if (centerX !== null && centerY !== null) {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const worldX = (centerX - rect.left) / oldZoom + this.cameraX - this.canvas.width / (2 * oldZoom);
+                    const worldY = (centerY - rect.top) / oldZoom + this.cameraY - this.canvas.height / (2 * oldZoom);
+                    
+                    this.cameraX = worldX + (this.cameraX - worldX) * (oldZoom / this.zoom);
+                    this.cameraY = worldY + (this.cameraY - worldY) * (oldZoom / this.zoom);
+                }
+                
+                this.updateCoordsDisplay();
+            }
+            
+            resetCamera() {
+                this.cameraX = this.mapWidth / 2;
+                this.cameraY = this.mapHeight / 2;
+                this.zoom = 5;
+                this.updateCoordsDisplay();
+                this.showNotification('Камера сброшена в центр');
+            }
+            
+            connectToServer() {
+                const wsUrl = `${this.wsProtocol}//${this.wsHost}`;
+                console.log('Connecting to WebSocket:', wsUrl);
+                
+                this.socket = new WebSocket(wsUrl);
+                
+                this.socket.onopen = () => {
+                    console.log('Connected to server');
+                    this.connectionStatus.textContent = '✓ Online';
+                    this.connectionStatus.className = 'connection-status connected';
+                    this.showNotification('Подключено к серверу');
+                    
+                    this.sendMessage('join', {
+                        playerId: this.playerId,
+                        tokens: this.tokens,
+                        level: this.level,
+                        color: this.selectedColor,
+                        username: 'Player_' + this.playerId.substr(7, 4)
+                    });
+                };
+                
+                this.socket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        this.handleServerMessage(data);
+                    } catch (error) {
+                        console.error('Error parsing message:', error);
+                    }
+                };
+                
+                this.socket.onclose = () => {
+                    console.log('Disconnected from server');
+                    this.connectionStatus.textContent = '✗ Offline';
+                    this.connectionStatus.className = 'connection-status disconnected';
+                    this.showNotification('Потеряно соединение с сервером. Переподключение...');
+                    setTimeout(() => this.connectToServer(), 3000);
+                };
+                
+                this.socket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    this.connectionStatus.textContent = '⚠ Error';
+                    this.connectionStatus.className = 'connection-status disconnected';
+                };
+            }
+            
+            handleServerMessage(data) {
+                switch (data.type) {
+                    case 'pixelUpdate':
+                        this.pixels[data.pixelId] = data.color;
+                        // Анимация нового пикселя
+                        this.animatePixel(data.x, data.y, data.color);
+                        if (data.playerId !== this.playerId) {
+                            this.showNotification(`${data.playerName} поставил пиксель`);
+                        }
+                        break;
+                        
+                    case 'pixelsReset':
+                        // Удаляем пиксели игрока
+                        for (let pixelId in this.pixels) {
+                            if (this.pixels[pixelId] === data.color) {
+                                delete this.pixels[pixelId];
+                            }
+                        }
+                        this.showNotification(`${data.playerName} использовал динамит!`);
+                        break;
+                        
+                    case 'playerColorUpdate':
+                        if (this.players[data.playerId]) {
+                            this.players[data.playerId].color = data.color;
+                        }
+                        break;
+                        
+                    case 'playersUpdate':
+                        this.players = data.players;
+                        this.updateOnlineCount();
+                        break;
+                        
+                    case 'leaderboard':
+                        this.updateLeaderboard(data.players);
+                        break;
+                        
+                    case 'initialData':
+                        this.pixels = {};
+                        // Загружаем пиксели с сервера
+                        for (let pixelId in data.pixels) {
+                            this.pixels[pixelId] = data.pixels[pixelId].color;
+                        }
+                        this.players = data.players || {};
+                        this.updateOnlineCount();
+                        this.showNotification(`Загружено ${Object.keys(this.pixels).length} пикселей`);
+                        break;
+                        
+                    case 'playerLeft':
+                        this.showNotification(`${data.playerName} вышел из игры`);
+                        break;
+                        
+                    case 'welcome':
+                        this.showNotification(data.message);
+                        break;
+                        
+                    case 'ping':
+                        this.sendMessage('pong', { timestamp: Date.now() });
+                        break;
+                }
+            }
+            
+            animatePixel(x, y, color) {
+                // Временная анимация для нового пикселя
+                const tempColor = this.ctx.fillStyle;
+                
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fillRect(x, y, 1, 1);
+                
+                setTimeout(() => {
+                    this.ctx.fillStyle = color;
+                    this.ctx.fillRect(x, y, 1, 1);
+                    this.ctx.fillStyle = tempColor;
+                }, 100);
+            }
+            
+            sendMessage(type, data) {
+                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(JSON.stringify({ type, ...data }));
+                }
+            }
+            
+            placePixel(x, y) {
+                if (this.energy <= 0) return;
+                
+                const pixelId = `${x},${y}`;
+                
+                // Отправляем на сервер
+                this.sendMessage('placePixel', {
+                    pixelId,
+                    x, y,
+                    color: this.selectedColor,
+                    playerId: this.playerId
+                });
+                
+                this.energy--;
+                this.tokens += 0.050;
+                this.level = Math.min(Math.floor(this.tokens / 1) + 1, 20);
+                
+                this.updateUI();
+                this.saveGame();
+            }
+            
+            sendColorUpdate() {
+                this.sendMessage('updateColor', {
+                    playerId: this.playerId,
+                    color: this.selectedColor
+                });
+            }
+            
+            useDynamite() {
+                if (this.tokens >= 100) {
+                    this.tokens -= 100;
+                    
+                    // Отправляем на сервер
+                    this.sendMessage('useDynamite', {
+                        playerId: this.playerId
+                    });
+                    
+                    this.updateUI();
+                    this.saveGame();
+                    this.showNotification('Динамит активирован!');
+                } else {
+                    this.showNotification('Недостаточно пикселей для динамита!');
+                }
+            }
+            
+            showNotification(message) {
+                // Удаляем предыдущие уведомления
+                const existingNotification = document.querySelector('.notification');
+                if (existingNotification) {
+                    existingNotification.remove();
+                }
+                
+                const notification = document.createElement('div');
+                notification.className = 'notification';
+                notification.textContent = message;
+                document.body.appendChild(notification);
+                
+                // Автоматическое удаление через 3 секунды
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 3000);
+            }
+            
+            updateCoordsDisplay() {
+                document.getElementById('coordX').textContent = Math.floor(this.cameraX);
+                document.getElementById('coordY').textContent = Math.floor(this.cameraY);
+                document.getElementById('zoomLevel').textContent = Math.round(this.zoom * 100) + '%';
+                document.getElementById('zoomPercent').textContent = Math.round(this.zoom * 100) + '%';
+                document.getElementById('pixelSize').textContent = Math.round(this.zoom) + 'px';
+            }
+            
+            updateUI() {
+                document.getElementById('tokens').textContent = this.tokens.toFixed(3);
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('energy').textContent = this.energy;
+                document.getElementById('energyFill').style.width = this.energy + '%';
+                
+                document.getElementById('dynamiteButton').disabled = this.tokens < 100;
+            }
+            
+            updateOnlineCount() {
+                const onlineCount = Object.keys(this.players).length;
+                document.getElementById('onlineCount').textContent = onlineCount;
+            }
+            
+            updateLeaderboard(players) {
+                const leaderboardList = document.getElementById('leaderboardList');
+                leaderboardList.innerHTML = '';
+                
+                const playersArray = Object.values(players).sort((a, b) => b.tokens - a.tokens);
+                
+                playersArray.forEach((player, index) => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <span style="color: ${player.id === this.playerId ? '#ffd700' : player.color}">
+                            ${index + 1}. ${player.id === this.playerId ? '🎯 ВЫ' : '👤 ' + (player.username || player.id.substr(0, 8))} - 
+                            ${player.tokens.toFixed(3)} пикс.
+                        </span>
+                    `;
+                    leaderboardList.appendChild(li);
+                });
+            }
+            
+            setupCanvas() {
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+            }
+            
+            resizeCanvas() {
+                this.canvas.style.width = '100%';
+                this.canvas.style.height = '100%';
+                this.canvas.width = this.container.clientWidth;
+                this.canvas.height = this.container.clientHeight;
+            }
+            
+            gameLoop() {
+                this.render();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+            
+            render() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.save();
+                
+                // Применяем трансформации камеры
+                this.ctx.scale(this.zoom, this.zoom);
+                this.ctx.translate(
+                    -this.cameraX + this.canvas.width / (2 * this.zoom),
+                    -this.cameraY + this.canvas.height / (2 * this.zoom)
+                );
+                
+                // Черный фон
+                this.ctx.fillStyle = '#000000';
+                this.ctx.fillRect(0, 0, this.mapWidth, this.mapHeight);
+                
+                // Рисуем сетку если включена
+                if (this.showGrid) {
+                    this.drawGrid();
+                }
+                
+                // Рисуем границы карты
+                this.drawMapBounds();
+                
+                // Рисуем пиксели
+                this.drawPixels();
+                
+                this.ctx.restore();
+            }
+            
+            drawGrid() {
+                // ЯРКАЯ БЕЛАЯ СЕТКА
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                this.ctx.lineWidth = 0.2 / this.zoom;
+                
+                // Вертикальные линии
+                for (let x = 0; x <= this.mapWidth; x++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.mapHeight);
+                    this.ctx.stroke();
+                }
+                
+                // Горизонтальные линии
+                for (let y = 0; y <= this.mapHeight; y++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.mapWidth, y);
+                    this.ctx.stroke();
+                }
+                
+                // Белые точки на пересечениях при большом зуме
+                if (this.zoom > 3) {
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                    for (let x = 0; x <= this.mapWidth; x++) {
+                        for (let y = 0; y <= this.mapHeight; y++) {
+                            this.ctx.fillRect(x - 0.15, y - 0.15, 0.3, 0.3);
+                        }
+                    }
+                }
+            }
+            
+            drawMapBounds() {
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                this.ctx.lineWidth = 2 / this.zoom;
+                this.ctx.strokeRect(0, 0, this.mapWidth, this.mapHeight);
+            }
+            
+            drawPixels() {
+                Object.keys(this.pixels).forEach(pixelId => {
+                    const [x, y] = pixelId.split(',').map(Number);
+                    const color = this.pixels[pixelId];
+                    
+                    this.ctx.fillStyle = color;
+                    this.ctx.fillRect(x, y, 1, 1);
+                    
+                    // Обводка для лучшей видимости
+                    if (this.zoom > 2) {
+                        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                        this.ctx.lineWidth = 0.1 / this.zoom;
+                        this.ctx.strokeRect(x, y, 1, 1);
+                    }
+                });
+            }
+            
+            saveGame() {
+                localStorage.setItem('tokens', this.tokens);
+                localStorage.setItem('level', this.level);
+                localStorage.setItem('energy', this.energy);
+                localStorage.setItem('selectedColor', this.selectedColor);
+            }
+        }
+        
+        // Инициализация игры
+        window.addEventListener('load', () => {
+            window.pixelGame = new PixelGame();
+            
+            // Восстановление энергии
+            setInterval(() => {
+                if (window.pixelGame && window.pixelGame.energy < 100) {
+                    window.pixelGame.energy = Math.min(100, window.pixelGame.energy + 1);
+                    window.pixelGame.updateUI();
+                    window.pixelGame.saveGame();
+                }
+            }, 2000);
+        });
+        
+        // Предотвращаем стандартное поведение браузера
+        document.addEventListener('gesturestart', (e) => e.preventDefault());
+        document.addEventListener('gesturechange', (e) => e.preventDefault());
+        document.addEventListener('gestureend', (e) => e.preventDefault());
+    </script>
+</body>
+</html>
