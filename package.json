@@ -14,12 +14,7 @@
   "engines": {
     "node": ">=16.0.0"
   },
-  "keywords": [
-    "game",
-    "multiplayer",
-    "pixel",
-    "websocket"
-  ],
-  "author": "Pixel Battle Team",
+  "keywords": ["game", "multiplayer", "pixel", "websocket"],
+  "author": "Your Name",
   "license": "MIT"
 }
