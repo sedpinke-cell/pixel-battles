@@ -224,6 +224,46 @@
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
         
+        .current-color {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            border: 3px solid white;
+            margin-left: 12px;
+            box-shadow: 0 0 15px currentColor;
+        }
+        
+        .energy-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        
+        .energy-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00ccff);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+        
+        .grid-toggle {
+            position: absolute;
+            bottom: 20px;
+            left: 110px;
+            z-index: 100;
+        }
+        
+        #toggleGrid {
+            padding: 12px 16px;
+            background: linear-gradient(45deg, #666, #888);
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        
         .coords {
             position: absolute;
             bottom: 120px;
@@ -257,46 +297,6 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
         }
         
-        .energy-bar {
-            width: 100%;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-            margin-top: 8px;
-            overflow: hidden;
-        }
-        
-        .energy-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #00ff88, #00ccff);
-            border-radius: 4px;
-            transition: width 0.3s ease;
-            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
-        }
-        
-        .current-color {
-            width: 30px;
-            height: 30px;
-            border-radius: 8px;
-            border: 3px solid white;
-            margin-left: 12px;
-            box-shadow: 0 0 15px currentColor;
-        }
-        
-        .grid-toggle {
-            position: absolute;
-            bottom: 20px;
-            left: 110px;
-            z-index: 100;
-        }
-        
-        #toggleGrid {
-            padding: 12px 16px;
-            background: linear-gradient(45deg, #666, #888);
-            border-radius: 10px;
-            font-size: 14px;
-        }
-        
         .notification {
             position: fixed;
             top: 20px;
@@ -318,6 +318,29 @@
             to { transform: translateX(-50%) translateY(0); opacity: 1; }
         }
         
+        .connection-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .connection-status.connected {
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+        
+        .connection-status.disconnected {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff4444;
+            border: 1px solid #ff4444;
+        }
+
         /* Адаптивность */
         @media (max-width: 480px) {
             .ui-panel {
@@ -388,34 +411,11 @@
         .pixel-placed {
             animation: pixelPlaced 0.3s ease-out;
         }
-        
-        .connection-status {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 100;
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        
-        .connection-status.connected {
-            background: rgba(0, 255, 0, 0.2);
-            color: #00ff00;
-            border: 1px solid #00ff00;
-        }
-        
-        .connection-status.disconnected {
-            background: rgba(255, 0, 0, 0.2);
-            color: #ff4444;
-            border: 1px solid #ff4444;
-        }
     </style>
 </head>
 <body>
     <div id="gameContainer">
-        <canvas id="gameCanvas" width="250" height="250"></canvas>
+        <canvas id="gameCanvas"></canvas>
         
         <div class="ui-panel">
             <div class="player-stats">
@@ -503,9 +503,9 @@
                 // Переменные камеры - УВЕЛИЧЕННЫЙ ZOOM
                 this.cameraX = 125;
                 this.cameraY = 125;
-                this.zoom = 5; // Увеличенный начальный zoom
-                this.minZoom = 1; // Минимальный zoom увеличен
-                this.maxZoom = 20; // Максимальный zoom увеличен
+                this.zoom = 5;
+                this.minZoom = 1;
+                this.maxZoom = 20;
                 
                 // Размеры карты
                 this.mapWidth = 250;
@@ -516,6 +516,7 @@
                 this.isDragging = false;
                 this.lastTouchX = 0;
                 this.lastTouchY = 0;
+                this.lastPinchDistance = null;
                 
                 // WebSocket соединение
                 this.socket = null;
@@ -584,7 +585,6 @@
                         currentColorElement.style.background = this.selectedColor;
                         localStorage.setItem('selectedColor', this.selectedColor);
                         
-                        // Отправляем обновление цвета на сервер
                         this.sendColorUpdate();
                         this.showNotification(`Цвет изменен на ${option.title}`);
                     });
@@ -771,55 +771,59 @@
             }
             
             connectToServer() {
-                const wsUrl = `${this.wsProtocol}//${this.wsHost}`;
-                console.log('Connecting to WebSocket:', wsUrl);
-                
-                this.socket = new WebSocket(wsUrl);
-                
-                this.socket.onopen = () => {
-                    console.log('Connected to server');
-                    this.connectionStatus.textContent = '✓ Online';
-                    this.connectionStatus.className = 'connection-status connected';
-                    this.showNotification('Подключено к серверу');
+                try {
+                    const wsUrl = `${this.wsProtocol}//${this.wsHost}`;
+                    console.log('Connecting to WebSocket:', wsUrl);
                     
-                    this.sendMessage('join', {
-                        playerId: this.playerId,
-                        tokens: this.tokens,
-                        level: this.level,
-                        color: this.selectedColor,
-                        username: 'Player_' + this.playerId.substr(7, 4)
-                    });
-                };
-                
-                this.socket.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        this.handleServerMessage(data);
-                    } catch (error) {
-                        console.error('Error parsing message:', error);
-                    }
-                };
-                
-                this.socket.onclose = () => {
-                    console.log('Disconnected from server');
-                    this.connectionStatus.textContent = '✗ Offline';
-                    this.connectionStatus.className = 'connection-status disconnected';
-                    this.showNotification('Потеряно соединение с сервером. Переподключение...');
-                    setTimeout(() => this.connectToServer(), 3000);
-                };
-                
-                this.socket.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    this.connectionStatus.textContent = '⚠ Error';
-                    this.connectionStatus.className = 'connection-status disconnected';
-                };
+                    this.socket = new WebSocket(wsUrl);
+                    
+                    this.socket.onopen = () => {
+                        console.log('Connected to server');
+                        this.connectionStatus.textContent = '✓ Online';
+                        this.connectionStatus.className = 'connection-status connected';
+                        this.showNotification('Подключено к серверу');
+                        
+                        this.sendMessage('join', {
+                            playerId: this.playerId,
+                            tokens: this.tokens,
+                            level: this.level,
+                            color: this.selectedColor,
+                            username: 'Player_' + this.playerId.substr(7, 4)
+                        });
+                    };
+                    
+                    this.socket.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.handleServerMessage(data);
+                        } catch (error) {
+                            console.error('Error parsing message:', error);
+                        }
+                    };
+                    
+                    this.socket.onclose = () => {
+                        console.log('Disconnected from server');
+                        this.connectionStatus.textContent = '✗ Offline';
+                        this.connectionStatus.className = 'connection-status disconnected';
+                        this.showNotification('Потеряно соединение с сервером. Переподключение...');
+                        setTimeout(() => this.connectToServer(), 3000);
+                    };
+                    
+                    this.socket.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.connectionStatus.textContent = '⚠ Error';
+                        this.connectionStatus.className = 'connection-status disconnected';
+                    };
+                } catch (error) {
+                    console.error('WebSocket connection error:', error);
+                    setTimeout(() => this.connectToServer(), 5000);
+                }
             }
             
             handleServerMessage(data) {
                 switch (data.type) {
                     case 'pixelUpdate':
                         this.pixels[data.pixelId] = data.color;
-                        // Анимация нового пикселя
                         this.animatePixel(data.x, data.y, data.color);
                         if (data.playerId !== this.playerId) {
                             this.showNotification(`${data.playerName} поставил пиксель`);
@@ -827,7 +831,6 @@
                         break;
                         
                     case 'pixelsReset':
-                        // Удаляем пиксели игрока
                         for (let pixelId in this.pixels) {
                             if (this.pixels[pixelId] === data.color) {
                                 delete this.pixels[pixelId];
@@ -853,13 +856,12 @@
                         
                     case 'initialData':
                         this.pixels = {};
-                        // Загружаем пиксели с сервера
                         for (let pixelId in data.pixels) {
                             this.pixels[pixelId] = data.pixels[pixelId].color;
                         }
                         this.players = data.players || {};
                         this.updateOnlineCount();
-                        this.showNotification(`Загружено ${Object.keys(this.pixels).length} пикселей`);
+                        this.showNotification(data.message || `Загружено ${Object.keys(this.pixels).length} пикселей`);
                         break;
                         
                     case 'playerLeft':
@@ -877,7 +879,6 @@
             }
             
             animatePixel(x, y, color) {
-                // Временная анимация для нового пикселя
                 const tempColor = this.ctx.fillStyle;
                 
                 this.ctx.fillStyle = '#ffffff';
@@ -901,7 +902,6 @@
                 
                 const pixelId = `${x},${y}`;
                 
-                // Отправляем на сервер
                 this.sendMessage('placePixel', {
                     pixelId,
                     x, y,
@@ -928,7 +928,6 @@
                 if (this.tokens >= 100) {
                     this.tokens -= 100;
                     
-                    // Отправляем на сервер
                     this.sendMessage('useDynamite', {
                         playerId: this.playerId
                     });
@@ -942,7 +941,6 @@
             }
             
             showNotification(message) {
-                // Удаляем предыдущие уведомления
                 const existingNotification = document.querySelector('.notification');
                 if (existingNotification) {
                     existingNotification.remove();
@@ -953,7 +951,6 @@
                 notification.textContent = message;
                 document.body.appendChild(notification);
                 
-                // Автоматическое удаление через 3 секунды
                 setTimeout(() => {
                     if (notification.parentNode) {
                         notification.remove();
@@ -1007,10 +1004,13 @@
             }
             
             resizeCanvas() {
-                this.canvas.style.width = '100%';
-                this.canvas.style.height = '100%';
-                this.canvas.width = this.container.clientWidth;
-                this.canvas.height = this.container.clientHeight;
+                const dpr = window.devicePixelRatio || 1;
+                const rect = this.container.getBoundingClientRect();
+                
+                this.canvas.width = rect.width * dpr;
+                this.canvas.height = rect.height * dpr;
+                this.canvas.style.width = rect.width + 'px';
+                this.canvas.style.height = rect.height + 'px';
             }
             
             gameLoop() {
@@ -1019,14 +1019,16 @@
             }
             
             render() {
+                const dpr = window.devicePixelRatio || 1;
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                 this.ctx.save();
                 
-                // Применяем трансформации камеры
-                this.ctx.scale(this.zoom, this.zoom);
+                // Применяем трансформации камеры с учетом DPI
+                const scale = this.zoom * dpr;
+                this.ctx.scale(scale, scale);
                 this.ctx.translate(
-                    -this.cameraX + this.canvas.width / (2 * this.zoom),
-                    -this.cameraY + this.canvas.height / (2 * this.zoom)
+                    -this.cameraX + this.canvas.width / (2 * scale),
+                    -this.cameraY + this.canvas.height / (2 * scale)
                 );
                 
                 // Черный фон
@@ -1048,7 +1050,6 @@
             }
             
             drawGrid() {
-                // ЯРКАЯ БЕЛАЯ СЕТКА
                 this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
                 this.ctx.lineWidth = 0.2 / this.zoom;
                 
