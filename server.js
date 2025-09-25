@@ -19,8 +19,8 @@ class PixelServer {
     }
     
     setupExpress() {
-        this.app.use(express.static(path.join(__dirname, 'public')));
-        this.app.use(express.json());
+        // Правильная настройка статических файлов
+        this.app.use(express.static(path.join(__dirname)));
         
         this.app.get('/', (req, res) => {
             res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -33,6 +33,11 @@ class PixelServer {
                 pixels: this.pixels.size,
                 mapSize: '250x250'
             });
+        });
+        
+        // Добавьте fallback для SPA
+        this.app.get('*', (req, res) => {
+            res.sendFile(path.join(__dirname, 'public', 'index.html'));
         });
     }
     
@@ -124,7 +129,8 @@ class PixelServer {
         
         this.broadcast({
             type: 'pixelUpdate',
-            pixelId, x, y, color: pixelColor, playerId
+            pixelId, x, y, color: pixelColor, playerId,
+            playerName: player.username
         });
         
         this.broadcastLeaderboard();
@@ -143,7 +149,11 @@ class PixelServer {
             }
         }
         
-        this.broadcast({ type: 'pixelsReset', playerId: message.playerId });
+        this.broadcast({ 
+            type: 'pixelsReset', 
+            playerId: message.playerId,
+            playerName: player.username
+        });
         this.broadcastLeaderboard();
         this.savePixels();
     }
@@ -179,6 +189,12 @@ class PixelServer {
             if (player.ws === ws) {
                 this.players.delete(playerId);
                 console.log(`Player ${player.username} disconnected`);
+                
+                this.broadcast({
+                    type: 'playerLeft',
+                    playerId: playerId,
+                    playerName: player.username
+                });
                 break;
             }
         }
@@ -207,7 +223,8 @@ class PixelServer {
             type: 'initialData',
             pixels: pixels,
             players: players,
-            mapSize: { width: 250, height: 250 }
+            mapSize: { width: 250, height: 250 },
+            message: 'Добро пожаловать в Pixel Battle!'
         }));
     }
     
@@ -308,6 +325,7 @@ class PixelServer {
             console.log('🎮 Pixel Battle Server started!');
             console.log(`📍 Port: ${port}`);
             console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`📁 Static files from: ${path.join(__dirname, 'public')}`);
         });
     }
 }
