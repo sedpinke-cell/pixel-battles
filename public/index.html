@@ -49,7 +49,17 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
         
-        .controls {
+        .mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .desktop-controls {
             position: absolute;
             bottom: 20px;
             right: 20px;
@@ -318,17 +328,71 @@
             to { transform: translateX(-50%) translateY(0); opacity: 1; }
         }
         
-        /* Адаптивность */
-        @media (max-width: 480px) {
+        /* Модальное окно для ника */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            backdrop-filter: blur(10px);
+        }
+        
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            text-align: center;
+            min-width: 300px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+        
+        .modal h2 {
+            margin-bottom: 20px;
+            color: #ffd700;
+        }
+        
+        .modal input {
+            width: 100%;
+            padding: 15px;
+            margin: 15px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+            text-align: center;
+        }
+        
+        .modal button {
+            width: 100%;
+            margin-top: 10px;
+            background: linear-gradient(45deg, #4a4a4a, #6a6a6a);
+        }
+        
+        /* Адаптивность для мобильных */
+        @media (max-width: 768px) {
             .ui-panel {
                 min-width: 170px;
                 padding: 12px;
+                top: 5px;
+                left: 5px;
             }
             
             #leaderboard {
                 max-width: 250px;
                 padding: 15px;
-                top: 80px;
+                top: 70px;
+                right: 5px;
+                max-height: 50vh;
             }
             
             #handButton {
@@ -336,11 +400,13 @@
                 height: 70px;
                 bottom: 15px;
                 left: 15px;
+                font-size: 16px;
             }
             
             #colorPicker {
-                padding: 10px;
-                gap: 8px;
+                padding: 8px;
+                gap: 6px;
+                top: 10px;
             }
             
             .color-option {
@@ -349,13 +415,43 @@
             }
             
             button {
-                padding: 12px 16px;
+                padding: 12px 14px;
                 font-size: 14px;
             }
             
             .grid-toggle {
                 left: 95px;
                 bottom: 15px;
+            }
+            
+            .coords {
+                bottom: 100px;
+                padding: 10px 15px;
+                font-size: 12px;
+            }
+            
+            .zoom-info {
+                display: none;
+            }
+            
+            .desktop-controls {
+                display: none;
+            }
+            
+            .mobile-controls {
+                display: flex;
+                bottom: 15px;
+                right: 15px;
+            }
+        }
+        
+        @media (min-width: 769px) {
+            .mobile-controls {
+                display: none;
+            }
+            
+            .desktop-controls {
+                display: flex;
             }
         }
         
@@ -377,16 +473,6 @@
         
         .pulse {
             animation: pulse 2s infinite;
-        }
-        
-        @keyframes pixelPlaced {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
-        
-        .pixel-placed {
-            animation: pixelPlaced 0.3s ease-out;
         }
         
         .connection-status {
@@ -411,9 +497,29 @@
             color: #ff4444;
             border: 1px solid #ff4444;
         }
+        
+        /* Улучшенная сетка как на фото */
+        .grid-line {
+            stroke: #333333;
+            stroke-width: 0.5;
+        }
+        
+        .grid-dot {
+            fill: #444444;
+        }
     </style>
 </head>
 <body>
+    <!-- Модальное окно для ввода ника -->
+    <div id="usernameModal" class="modal">
+        <div class="modal-content">
+            <h2>🎮 Введите ваш ник</h2>
+            <input type="text" id="usernameInput" maxlength="15" placeholder="Введите ваш никнейм" autocomplete="off">
+            <button id="saveUsername">Сохранить и играть</button>
+            <p style="margin-top: 15px; opacity: 0.7; font-size: 14px;">Максимум 15 символов</p>
+        </div>
+    </div>
+
     <div id="gameContainer">
         <canvas id="gameCanvas" width="250" height="250"></canvas>
         
@@ -435,6 +541,9 @@
                 <div class="stat">
                     👤 Онлайн: <span class="stat-value" id="onlineCount">1</span>
                 </div>
+                <div class="stat">
+                    🎯 Ник: <span class="stat-value" id="playerName">Гость</span>
+                </div>
             </div>
         </div>
         
@@ -455,12 +564,21 @@
             <button id="toggleGrid">📋 Сетка</button>
         </div>
         
-        <div class="controls">
+        <!-- Управление для десктопа -->
+        <div class="desktop-controls">
             <button id="dynamiteButton">💣 Динамит (100)</button>
             <button id="zoomIn">🔍 + Увеличить</button>
             <button id="zoomOut">🔍 - Уменьшить</button>
             <button id="resetView">🎯 Центр</button>
             <button id="maxZoom">🔎 Макс. zoom</button>
+        </div>
+        
+        <!-- Управление для мобильных -->
+        <div class="mobile-controls">
+            <button id="mobileDynamite">💣 (100)</button>
+            <button id="mobileZoomIn">🔍 +</button>
+            <button id="mobileZoomOut">🔍 -</button>
+            <button id="mobileReset">🎯</button>
         </div>
         
         <div class="coords">
@@ -499,13 +617,14 @@
                 this.playerId = localStorage.getItem('playerId') || this.generatePlayerId();
                 this.selectedColor = localStorage.getItem('selectedColor') || '#ff4444';
                 this.showGrid = localStorage.getItem('showGrid') !== 'false';
+                this.username = localStorage.getItem('username') || '';
                 
-                // Переменные камеры - УВЕЛИЧЕННЫЙ ZOOM
+                // Переменные камеры
                 this.cameraX = 125;
                 this.cameraY = 125;
-                this.zoom = 5; // Увеличенный начальный zoom
-                this.minZoom = 1; // Минимальный zoom увеличен
-                this.maxZoom = 20; // Максимальный zoom увеличен
+                this.zoom = 5;
+                this.minZoom = 1;
+                this.maxZoom = 20;
                 
                 // Размеры карты
                 this.mapWidth = 250;
@@ -536,19 +655,57 @@
                 this.setupCanvas();
                 this.setupEventListeners();
                 this.setupColorPicker();
-                this.connectToServer();
+                this.showUsernameModal();
                 this.updateUI();
-                this.gameLoop();
+            }
+            
+            showUsernameModal() {
+                if (!this.username) {
+                    const modal = document.getElementById('usernameModal');
+                    const input = document.getElementById('usernameInput');
+                    const saveBtn = document.getElementById('saveUsername');
+                    
+                    modal.style.display = 'block';
+                    
+                    const saveUsername = () => {
+                        const name = input.value.trim();
+                        if (name && name.length > 0) {
+                            this.username = name.substring(0, 15);
+                            localStorage.setItem('username', this.username);
+                            modal.style.display = 'none';
+                            document.getElementById('playerName').textContent = this.username;
+                            this.connectToServer();
+                            this.gameLoop();
+                        }
+                    };
+                    
+                    saveBtn.addEventListener('click', saveUsername);
+                    input.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') saveUsername();
+                    });
+                    
+                    input.focus();
+                } else {
+                    document.getElementById('playerName').textContent = this.username;
+                    this.connectToServer();
+                    this.gameLoop();
+                }
             }
             
             setupEventListeners() {
-                // Кнопки управления
+                // Кнопки управления для десктопа
                 document.getElementById('dynamiteButton').addEventListener('click', () => this.useDynamite());
                 document.getElementById('zoomIn').addEventListener('click', () => this.setZoom(this.zoom * 1.5));
                 document.getElementById('zoomOut').addEventListener('click', () => this.setZoom(this.zoom / 1.5));
                 document.getElementById('resetView').addEventListener('click', () => this.resetCamera());
                 document.getElementById('maxZoom').addEventListener('click', () => this.setZoom(this.maxZoom));
                 document.getElementById('toggleGrid').addEventListener('click', () => this.toggleGrid());
+                
+                // Кнопки управления для мобильных
+                document.getElementById('mobileDynamite').addEventListener('click', () => this.useDynamite());
+                document.getElementById('mobileZoomIn').addEventListener('click', () => this.setZoom(this.zoom * 1.5));
+                document.getElementById('mobileZoomOut').addEventListener('click', () => this.setZoom(this.zoom / 1.5));
+                document.getElementById('mobileReset').addEventListener('click', () => this.resetCamera());
                 
                 // Кнопка руки
                 document.getElementById('handButton').addEventListener('click', () => this.toggleHandMode());
@@ -584,13 +741,11 @@
                         currentColorElement.style.background = this.selectedColor;
                         localStorage.setItem('selectedColor', this.selectedColor);
                         
-                        // Отправляем обновление цвета на сервер
                         this.sendColorUpdate();
                         this.showNotification(`Цвет изменен на ${option.title}`);
                     });
                 });
                 
-                // Устанавливаем начальный цвет
                 currentColorElement.style.background = this.selectedColor;
                 const activeColor = document.querySelector(`.color-option[data-color="${this.selectedColor}"]`);
                 if (activeColor) {
@@ -787,7 +942,7 @@
                         tokens: this.tokens,
                         level: this.level,
                         color: this.selectedColor,
-                        username: 'Player_' + this.playerId.substr(7, 4)
+                        username: this.username
                     });
                 };
                 
@@ -819,7 +974,6 @@
                 switch (data.type) {
                     case 'pixelUpdate':
                         this.pixels[data.pixelId] = data.color;
-                        // Анимация нового пикселя
                         this.animatePixel(data.x, data.y, data.color);
                         if (data.playerId !== this.playerId) {
                             this.showNotification(`${data.playerName} поставил пиксель`);
@@ -827,7 +981,6 @@
                         break;
                         
                     case 'pixelsReset':
-                        // Удаляем пиксели игрока
                         for (let pixelId in this.pixels) {
                             if (this.pixels[pixelId] === data.color) {
                                 delete this.pixels[pixelId];
@@ -842,52 +995,25 @@
                         }
                         break;
                         
-                    case 'playersUpdate':
+                    case 'playerList':
                         this.players = data.players;
                         this.updateOnlineCount();
                         break;
                         
                     case 'leaderboard':
-                        this.updateLeaderboard(data.players);
+                        this.updateLeaderboard(data.leaderboard);
                         break;
                         
-                    case 'initialData':
-                        this.pixels = {};
-                        // Загружаем пиксели с сервера
-                        for (let pixelId in data.pixels) {
-                            this.pixels[pixelId] = data.pixels[pixelId].color;
-                        }
-                        this.players = data.players || {};
-                        this.updateOnlineCount();
-                        this.showNotification(`Загружено ${Object.keys(this.pixels).length} пикселей`);
-                        break;
-                        
-                    case 'playerLeft':
-                        this.showNotification(`${data.playerName} вышел из игры`);
-                        break;
-                        
-                    case 'welcome':
-                        this.showNotification(data.message);
-                        break;
-                        
-                    case 'ping':
-                        this.sendMessage('pong', { timestamp: Date.now() });
+                    case 'playerStats':
+                        this.tokens = data.tokens;
+                        this.level = data.level;
+                        this.energy = data.energy;
+                        localStorage.setItem('tokens', this.tokens);
+                        localStorage.setItem('level', this.level);
+                        localStorage.setItem('energy', this.energy);
+                        this.updateUI();
                         break;
                 }
-            }
-            
-            animatePixel(x, y, color) {
-                // Временная анимация для нового пикселя
-                const tempColor = this.ctx.fillStyle;
-                
-                this.ctx.fillStyle = '#ffffff';
-                this.ctx.fillRect(x, y, 1, 1);
-                
-                setTimeout(() => {
-                    this.ctx.fillStyle = color;
-                    this.ctx.fillRect(x, y, 1, 1);
-                    this.ctx.fillStyle = tempColor;
-                }, 100);
             }
             
             sendMessage(type, data) {
@@ -897,68 +1023,180 @@
             }
             
             placePixel(x, y) {
-                if (this.energy <= 0) return;
+                if (this.energy <= 0) {
+                    this.showNotification('Недостаточно энергии!');
+                    return;
+                }
                 
                 const pixelId = `${x},${y}`;
+                this.pixels[pixelId] = this.selectedColor;
                 
-                // Отправляем на сервер
                 this.sendMessage('placePixel', {
-                    pixelId,
-                    x, y,
+                    playerId: this.playerId,
+                    x: x,
+                    y: y,
                     color: this.selectedColor,
-                    playerId: this.playerId
+                    username: this.username
                 });
                 
-                this.energy--;
-                this.tokens += 0.050;
-                this.level = Math.min(Math.floor(this.tokens / 1) + 1, 20);
-                
+                this.energy -= 1;
+                localStorage.setItem('energy', this.energy);
                 this.updateUI();
-                this.saveGame();
+                this.animatePixel(x, y, this.selectedColor);
+            }
+            
+            useDynamite() {
+                if (this.tokens < 100) {
+                    this.showNotification('Недостаточно пикселей для динамита!');
+                    return;
+                }
+                
+                if (confirm('Использовать динамит за 100 пикселей? Весь холст будет очищен!')) {
+                    this.sendMessage('useDynamite', {
+                        playerId: this.playerId,
+                        username: this.username
+                    });
+                    
+                    this.tokens -= 100;
+                    localStorage.setItem('tokens', this.tokens);
+                    this.updateUI();
+                    this.showNotification('Динамит активирован!');
+                }
             }
             
             sendColorUpdate() {
-                this.sendMessage('updateColor', {
+                this.sendMessage('playerColorUpdate', {
                     playerId: this.playerId,
                     color: this.selectedColor
                 });
             }
             
-            useDynamite() {
-                if (this.tokens >= 100) {
-                    this.tokens -= 100;
+            animatePixel(x, y, color) {
+                const rect = this.canvas.getBoundingClientRect();
+                const screenX = (x - this.cameraX + this.canvas.width / (2 * this.zoom)) * this.zoom;
+                const screenY = (y - this.cameraY + this.canvas.height / (2 * this.zoom)) * this.zoom;
+                
+                if (screenX >= 0 && screenX <= this.canvas.width && 
+                    screenY >= 0 && screenY <= this.canvas.height) {
                     
-                    // Отправляем на сервер
-                    this.sendMessage('useDynamite', {
-                        playerId: this.playerId
-                    });
-                    
-                    this.updateUI();
-                    this.saveGame();
-                    this.showNotification('Динамит активирован!');
-                } else {
-                    this.showNotification('Недостаточно пикселей для динамита!');
+                    const particleCount = 8;
+                    for (let i = 0; i < particleCount; i++) {
+                        setTimeout(() => {
+                            const particleX = screenX + (Math.random() - 0.5) * 20;
+                            const particleY = screenY + (Math.random() - 0.5) * 20;
+                            
+                            this.ctx.fillStyle = color;
+                            this.ctx.fillRect(particleX, particleY, 2, 2);
+                            
+                            setTimeout(() => {
+                                this.draw();
+                            }, 100);
+                        }, i * 50);
+                    }
                 }
             }
             
-            showNotification(message) {
-                // Удаляем предыдущие уведомления
-                const existingNotification = document.querySelector('.notification');
-                if (existingNotification) {
-                    existingNotification.remove();
+            setupCanvas() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                window.addEventListener('resize', () => {
+                    this.canvas.width = window.innerWidth;
+                    this.canvas.height = window.innerHeight;
+                    this.draw();
+                });
+            }
+            
+            draw() {
+                this.ctx.fillStyle = '#000000';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                const pixelSize = Math.max(1, this.zoom);
+                const startX = Math.floor(this.cameraX - this.canvas.width / (2 * this.zoom));
+                const startY = Math.floor(this.cameraY - this.canvas.height / (2 * this.zoom));
+                const endX = Math.ceil(this.cameraX + this.canvas.width / (2 * this.zoom));
+                const endY = Math.ceil(this.cameraY + this.canvas.height / (2 * this.zoom));
+                
+                // Рисуем сетку как на фото - черный фон с темно-серыми линиями
+                if (this.showGrid && this.zoom >= 3) {
+                    this.ctx.strokeStyle = '#333333';
+                    this.ctx.lineWidth = 0.5;
+                    
+                    for (let x = Math.max(0, startX); x <= Math.min(this.mapWidth, endX); x++) {
+                        const screenX = (x - this.cameraX + this.canvas.width / (2 * this.zoom)) * this.zoom;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(screenX, 0);
+                        this.ctx.lineTo(screenX, this.canvas.height);
+                        this.ctx.stroke();
+                    }
+                    
+                    for (let y = Math.max(0, startY); y <= Math.min(this.mapHeight, endY); y++) {
+                        const screenY = (y - this.cameraY + this.canvas.height / (2 * this.zoom)) * this.zoom;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(0, screenY);
+                        this.ctx.lineTo(this.canvas.width, screenY);
+                        this.ctx.stroke();
+                    }
+                    
+                    // Точки на пересечениях линий
+                    if (this.zoom >= 8) {
+                        this.ctx.fillStyle = '#444444';
+                        for (let x = Math.max(0, startX); x <= Math.min(this.mapWidth, endX); x++) {
+                            for (let y = Math.max(0, startY); y <= Math.min(this.mapHeight, endY); y++) {
+                                const screenX = (x - this.cameraX + this.canvas.width / (2 * this.zoom)) * this.zoom;
+                                const screenY = (y - this.cameraY + this.canvas.height / (2 * this.zoom)) * this.zoom;
+                                this.ctx.fillRect(screenX - 1, screenY - 1, 2, 2);
+                            }
+                        }
+                    }
                 }
                 
-                const notification = document.createElement('div');
-                notification.className = 'notification';
-                notification.textContent = message;
-                document.body.appendChild(notification);
-                
-                // Автоматическое удаление через 3 секунды
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.remove();
+                // Рисуем пиксели
+                for (let pixelId in this.pixels) {
+                    const [x, y] = pixelId.split(',').map(Number);
+                    
+                    if (x >= startX && x <= endX && y >= startY && y <= endY) {
+                        const screenX = (x - this.cameraX + this.canvas.width / (2 * this.zoom)) * this.zoom;
+                        const screenY = (y - this.cameraY + this.canvas.height / (2 * this.zoom)) * this.zoom;
+                        
+                        this.ctx.fillStyle = this.pixels[pixelId];
+                        this.ctx.fillRect(screenX, screenY, pixelSize, pixelSize);
                     }
-                }, 3000);
+                }
+            }
+            
+            updateUI() {
+                document.getElementById('tokens').textContent = Math.floor(this.tokens);
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('energy').textContent = this.energy;
+                document.getElementById('energyFill').style.width = this.energy + '%';
+                
+                const energyFill = document.getElementById('energyFill');
+                if (this.energy < 20) {
+                    energyFill.style.background = 'linear-gradient(90deg, #ff4444, #ff8844)';
+                } else if (this.energy < 50) {
+                    energyFill.style.background = 'linear-gradient(90deg, #ff8844, #ffff44)';
+                } else {
+                    energyFill.style.background = 'linear-gradient(90deg, #00ff88, #00ccff)';
+                }
+            }
+            
+            updateOnlineCount() {
+                const count = Object.keys(this.players).length;
+                document.getElementById('onlineCount').textContent = count;
+            }
+            
+            updateLeaderboard(leaderboard) {
+                const list = document.getElementById('leaderboardList');
+                list.innerHTML = '';
+                
+                leaderboard.slice(0, 10).forEach((player, index) => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <strong>${index + 1}. ${player.username}</strong><br>
+                        🔲 ${Math.floor(player.tokens)} | ⭐ ${player.level}
+                    `;
+                    list.appendChild(li);
+                });
             }
             
             updateCoordsDisplay() {
@@ -966,168 +1204,31 @@
                 document.getElementById('coordY').textContent = Math.floor(this.cameraY);
                 document.getElementById('zoomLevel').textContent = Math.round(this.zoom * 100) + '%';
                 document.getElementById('zoomPercent').textContent = Math.round(this.zoom * 100) + '%';
-                document.getElementById('pixelSize').textContent = Math.round(this.zoom) + 'px';
+                document.getElementById('pixelSize').textContent = Math.max(1, Math.round(this.zoom)) + 'px';
             }
             
-            updateUI() {
-                document.getElementById('tokens').textContent = this.tokens.toFixed(3);
-                document.getElementById('level').textContent = this.level;
-                document.getElementById('energy').textContent = this.energy;
-                document.getElementById('energyFill').style.width = this.energy + '%';
+            showNotification(message) {
+                const notification = document.createElement('div');
+                notification.className = 'notification';
+                notification.textContent = message;
                 
-                document.getElementById('dynamiteButton').disabled = this.tokens < 100;
-            }
-            
-            updateOnlineCount() {
-                const onlineCount = Object.keys(this.players).length;
-                document.getElementById('onlineCount').textContent = onlineCount;
-            }
-            
-            updateLeaderboard(players) {
-                const leaderboardList = document.getElementById('leaderboardList');
-                leaderboardList.innerHTML = '';
+                document.body.appendChild(notification);
                 
-                const playersArray = Object.values(players).sort((a, b) => b.tokens - a.tokens);
-                
-                playersArray.forEach((player, index) => {
-                    const li = document.createElement('li');
-                    li.innerHTML = `
-                        <span style="color: ${player.id === this.playerId ? '#ffd700' : player.color}">
-                            ${index + 1}. ${player.id === this.playerId ? '🎯 ВЫ' : '👤 ' + (player.username || player.id.substr(0, 8))} - 
-                            ${player.tokens.toFixed(3)} пикс.
-                        </span>
-                    `;
-                    leaderboardList.appendChild(li);
-                });
-            }
-            
-            setupCanvas() {
-                this.resizeCanvas();
-                window.addEventListener('resize', () => this.resizeCanvas());
-            }
-            
-            resizeCanvas() {
-                this.canvas.style.width = '100%';
-                this.canvas.style.height = '100%';
-                this.canvas.width = this.container.clientWidth;
-                this.canvas.height = this.container.clientHeight;
+                setTimeout(() => {
+                    notification.remove();
+                }, 3000);
             }
             
             gameLoop() {
-                this.render();
+                this.draw();
                 requestAnimationFrame(() => this.gameLoop());
-            }
-            
-            render() {
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                this.ctx.save();
-                
-                // Применяем трансформации камеры
-                this.ctx.scale(this.zoom, this.zoom);
-                this.ctx.translate(
-                    -this.cameraX + this.canvas.width / (2 * this.zoom),
-                    -this.cameraY + this.canvas.height / (2 * this.zoom)
-                );
-                
-                // Черный фон
-                this.ctx.fillStyle = '#000000';
-                this.ctx.fillRect(0, 0, this.mapWidth, this.mapHeight);
-                
-                // Рисуем сетку если включена
-                if (this.showGrid) {
-                    this.drawGrid();
-                }
-                
-                // Рисуем границы карты
-                this.drawMapBounds();
-                
-                // Рисуем пиксели
-                this.drawPixels();
-                
-                this.ctx.restore();
-            }
-            
-            drawGrid() {
-                // ЯРКАЯ БЕЛАЯ СЕТКА
-                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-                this.ctx.lineWidth = 0.2 / this.zoom;
-                
-                // Вертикальные линии
-                for (let x = 0; x <= this.mapWidth; x++) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(x, 0);
-                    this.ctx.lineTo(x, this.mapHeight);
-                    this.ctx.stroke();
-                }
-                
-                // Горизонтальные линии
-                for (let y = 0; y <= this.mapHeight; y++) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(0, y);
-                    this.ctx.lineTo(this.mapWidth, y);
-                    this.ctx.stroke();
-                }
-                
-                // Белые точки на пересечениях при большом зуме
-                if (this.zoom > 3) {
-                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-                    for (let x = 0; x <= this.mapWidth; x++) {
-                        for (let y = 0; y <= this.mapHeight; y++) {
-                            this.ctx.fillRect(x - 0.15, y - 0.15, 0.3, 0.3);
-                        }
-                    }
-                }
-            }
-            
-            drawMapBounds() {
-                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-                this.ctx.lineWidth = 2 / this.zoom;
-                this.ctx.strokeRect(0, 0, this.mapWidth, this.mapHeight);
-            }
-            
-            drawPixels() {
-                Object.keys(this.pixels).forEach(pixelId => {
-                    const [x, y] = pixelId.split(',').map(Number);
-                    const color = this.pixels[pixelId];
-                    
-                    this.ctx.fillStyle = color;
-                    this.ctx.fillRect(x, y, 1, 1);
-                    
-                    // Обводка для лучшей видимости
-                    if (this.zoom > 2) {
-                        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-                        this.ctx.lineWidth = 0.1 / this.zoom;
-                        this.ctx.strokeRect(x, y, 1, 1);
-                    }
-                });
-            }
-            
-            saveGame() {
-                localStorage.setItem('tokens', this.tokens);
-                localStorage.setItem('level', this.level);
-                localStorage.setItem('energy', this.energy);
-                localStorage.setItem('selectedColor', this.selectedColor);
             }
         }
         
-        // Инициализация игры
+        // Запуск игры после загрузки страницы
         window.addEventListener('load', () => {
-            window.pixelGame = new PixelGame();
-            
-            // Восстановление энергии
-            setInterval(() => {
-                if (window.pixelGame && window.pixelGame.energy < 100) {
-                    window.pixelGame.energy = Math.min(100, window.pixelGame.energy + 1);
-                    window.pixelGame.updateUI();
-                    window.pixelGame.saveGame();
-                }
-            }, 2000);
+            new PixelGame();
         });
-        
-        // Предотвращаем стандартное поведение браузера
-        document.addEventListener('gesturestart', (e) => e.preventDefault());
-        document.addEventListener('gesturechange', (e) => e.preventDefault());
-        document.addEventListener('gestureend', (e) => e.preventDefault());
     </script>
 </body>
 </html>
