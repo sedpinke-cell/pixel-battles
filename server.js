@@ -2,75 +2,90 @@ const WebSocket = require('ws');
 const http = require('http');
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Обслуживаем статические файлы
 app.use(express.static(path.join(__dirname, '.')));
+app.use(express.json());
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+// Загрузка и сохранение пикселей
+function loadPixels() {
+    try {
+        if (fs.existsSync('pixels.json')) {
+            return JSON.parse(fs.readFileSync('pixels.json', 'utf8'));
+        }
+    } catch (error) {
+        console.error('Error loading pixels:', error);
+    }
+    return {};
+}
 
-// Игровое состояние
+function savePixels(pixels) {
+    try {
+        fs.writeFileSync('pixels.json', JSON.stringify(pixels, null, 2));
+    } catch (error) {
+        console.error('Error saving pixels:', error);
+    }
+}
+
 const gameState = {
-    pixels: {},
+    pixels: loadPixels(),
     players: {},
     leaderboard: []
 };
 
-// Функция для обновления таблицы лидеров
 function updateLeaderboard() {
     gameState.leaderboard = Object.values(gameState.players)
         .sort((a, b) => b.tokens - a.tokens)
-        .slice(0, 10);
+        .slice(0, 100);
 }
 
-// Функция для восстановления энергии игроков
-function regenerateEnergy() {
-    Object.keys(gameState.players).forEach(playerId => {
-        const player = gameState.players[playerId];
-        if (player.energy < 100) {
-            player.energy = Math.min(100, player.energy + 10);
-            // Отправляем обновление энергии игроку
-            if (player.ws && player.ws.readyState === WebSocket.OPEN) {
-                player.ws.send(JSON.stringify({
-                    type: 'playerStats',
-                    tokens: player.tokens,
-                    level: player.level,
-                    energy: player.energy
-                }));
-            }
+function broadcastLeaderboard() {
+    const message = JSON.stringify({
+        type: 'leaderboardUpdate',
+        leaderboard: gameState.leaderboard.slice(0, 100),
+        topThree: gameState.leaderboard.slice(0, 3)
+    });
+    
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
         }
     });
 }
 
-// Восстановление энергии каждые 30 секунд
-setInterval(regenerateEnergy, 30000);
-
 wss.on('connection', (ws) => {
-    console.log('Новое подключение');
+    console.log('Новый игрок подключился');
     
-    ws.on('message', (message) => {
+    // Отправляем текущее состояние
+    ws.send(JSON.stringify({
+        type: 'initialData',
+        pixels: gameState.pixels,
+        leaderboard: gameState.leaderboard,
+        topThree: gameState.leaderboard.slice(0, 3)
+    }));
+    
+    ws.on('message', (data) => {
         try {
-            const data = JSON.parse(message);
-            handleMessage(ws, data);
+            const message = JSON.parse(data);
+            handleMessage(ws, message);
         } catch (error) {
             console.error('Ошибка парсинга сообщения:', error);
         }
     });
     
     ws.on('close', () => {
-        // Удаляем игрока при отключении
+        // Удаляем игрока
         for (let playerId in gameState.players) {
             if (gameState.players[playerId].ws === ws) {
+                console.log(`Игрок ${gameState.players[playerId].username} отключился`);
                 delete gameState.players[playerId];
                 break;
             }
         }
-        broadcastPlayerList();
         updateLeaderboard();
         broadcastLeaderboard();
     });
@@ -82,35 +97,14 @@ function handleMessage(ws, data) {
             gameState.players[data.playerId] = {
                 ws: ws,
                 playerId: data.playerId,
-                username: data.username || 'Гость',
+                username: data.username,
                 tokens: data.tokens || 0,
                 level: data.level || 1,
                 energy: data.energy || 100,
-                color: data.color || '#ff4444'
+                color: data.color || '#ff4444',
+                joinTime: Date.now()
             };
             
-            // Отправляем текущее состояние игроку
-            ws.send(JSON.stringify({
-                type: 'playerStats',
-                tokens: gameState.players[data.playerId].tokens,
-                level: gameState.players[data.playerId].level,
-                energy: gameState.players[data.playerId].energy
-            }));
-            
-            // Отправляем все существующие пиксели
-            for (let pixelId in gameState.pixels) {
-                const [x, y] = pixelId.split(',').map(Number);
-                ws.send(JSON.stringify({
-                    type: 'pixelUpdate',
-                    pixelId: pixelId,
-                    x: x,
-                    y: y,
-                    color: gameState.pixels[pixelId],
-                    playerId: 'server'
-                }));
-            }
-            
-            broadcastPlayerList();
             updateLeaderboard();
             broadcastLeaderboard();
             break;
@@ -121,116 +115,73 @@ function handleMessage(ws, data) {
                 const pixelId = `${data.x},${data.y}`;
                 gameState.pixels[pixelId] = data.color;
                 
-                // Награждаем игрока
+                // Обновляем статистику игрока
                 player.tokens += 0.1;
                 player.energy -= 1;
+                player.level = Math.floor(player.tokens / 100) + 1;
                 
-                // Проверяем повышение уровня
-                const newLevel = Math.floor(player.tokens / 100) + 1;
-                if (newLevel > player.level) {
-                    player.level = newLevel;
-                }
+                // Сохраняем пиксели
+                savePixels(gameState.pixels);
                 
-                // Отправляем обновление статистики
-                ws.send(JSON.stringify({
-                    type: 'playerStats',
-                    tokens: player.tokens,
-                    level: player.level,
-                    energy: player.energy
-                }));
-                
-                // Рассылаем обновление пикселя всем игрокам
-                broadcast({
-                    type: 'pixelUpdate',
+                // Рассылаем обновление
+                const message = JSON.stringify({
+                    type: 'pixelPlaced',
                     pixelId: pixelId,
                     x: data.x,
                     y: data.y,
                     color: data.color,
                     playerId: data.playerId,
-                    playerName: data.username
-                });
-                
-                updateLeaderboard();
-                broadcastLeaderboard();
-            }
-            break;
-            
-        case 'useDynamite':
-            const dynamitePlayer = gameState.players[data.playerId];
-            if (dynamitePlayer && dynamitePlayer.tokens >= 100) {
-                dynamitePlayer.tokens -= 100;
-                
-                // Очищаем все пиксели
-                gameState.pixels = {};
-                
-                // Рассылаем сообщение о сбросе
-                broadcast({
-                    type: 'pixelsReset',
-                    playerId: data.playerId,
                     playerName: data.username,
-                    color: '#000000'
+                    tokens: player.tokens,
+                    energy: player.energy,
+                    level: player.level
                 });
                 
-                // Отправляем обновление статистики
-                ws.send(JSON.stringify({
-                    type: 'playerStats',
-                    tokens: dynamitePlayer.tokens,
-                    level: dynamitePlayer.level,
-                    energy: dynamitePlayer.energy
-                }));
+                wss.clients.forEach(client => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(message);
+                    }
+                });
                 
                 updateLeaderboard();
                 broadcastLeaderboard();
             }
             break;
             
-        case 'playerColorUpdate':
+        case 'updateColor':
             if (gameState.players[data.playerId]) {
                 gameState.players[data.playerId].color = data.color;
-                broadcast({
-                    type: 'playerColorUpdate',
-                    playerId: data.playerId,
-                    color: data.color
-                });
             }
             break;
     }
 }
 
-function broadcast(message) {
-    const messageStr = JSON.stringify(message);
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(messageStr);
+// Автосохранение каждые 30 секунд
+setInterval(() => {
+    savePixels(gameState.pixels);
+    console.log('Пиксели автосохранены');
+}, 30000);
+
+// Восстановление энергии каждые 30 секунд
+setInterval(() => {
+    Object.values(gameState.players).forEach(player => {
+        if (player.energy < 100) {
+            player.energy = Math.min(100, player.energy + 10);
+            
+            // Отправляем обновление энергии
+            if (player.ws.readyState === WebSocket.OPEN) {
+                player.ws.send(JSON.stringify({
+                    type: 'energyUpdate',
+                    energy: player.energy
+                }));
+            }
         }
     });
-}
-
-function broadcastPlayerList() {
-    const players = {};
-    for (let playerId in gameState.players) {
-        players[playerId] = {
-            username: gameState.players[playerId].username,
-            tokens: gameState.players[playerId].tokens,
-            level: gameState.players[playerId].level
-        };
-    }
-    
-    broadcast({
-        type: 'playerList',
-        players: players
-    });
-}
-
-function broadcastLeaderboard() {
-    broadcast({
-        type: 'leaderboard',
-        leaderboard: gameState.leaderboard
-    });
-}
+}, 30000);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Сервер запущен на порту ${PORT}`);
-    console.log(`Откройте http://localhost:${PORT} в браузере`);
+    console.log(`🎮 Pixel Battle Server запущен!`);
+    console.log(`📍 Порт: ${PORT}`);
+    console.log(`🌐 Откройте: http://localhost:${PORT}`);
 });
