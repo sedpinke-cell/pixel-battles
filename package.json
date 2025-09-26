@@ -11,7 +11,10 @@
     "express": "^4.18.2",
     "ws": "^8.14.2"
   },
-  "keywords": ["game", "multiplayer", "pixel", "mobile"],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": ["game", "multiplayer", "pixel", "mobile", "websocket"],
   "author": "Pixel Battle Team",
   "license": "MIT"
 }
